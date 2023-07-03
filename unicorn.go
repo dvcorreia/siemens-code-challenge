@@ -1,24 +1,24 @@
 package unicorn
 
-// RequestID is used to identify pending unicorn production requests.
-type RequestID string
-
 // Unicorn is a horse with a beautiful horn.
 // They are have funny names and can do a lot of stuff.
 type Unicorn struct {
-	Name         string
-	Capabilities []string
+	Name         string   `json:"name"`
+	Capabilities []string `json:"capabilities"`
 }
 
-// UnicornService is a service that can produce happy beautiful unicorns.
-type UnicornService interface {
+// OrderID is used to identify pending unicorn production request orders.
+type OrderID string
+
+// Service is a service that can produce happy beautiful unicorns.
+type Service interface {
 	// RequestUnicorns initiates a new unicorn production request.
 	// If no sufficient unicorn are available, it returns a request ID for consequent pooling.
-	RequestUnicorns() (RequestID, []Unicorn)
+	OrderUnicorns(n int) (OrderID, error)
 
-	// Pool returns avalilable unicorns for a request ID order.
-	Pool(RequestID) []Unicorn
+	// Pool returns the available ordered unicorns and how many are left to produce.
+	Pool(OrderID) (int, []Unicorn)
 
-	// Validate check is a request ID has an orden in the process.
-	Validate(RequestID) bool
+	// Validate checks if an ID has an orden in the process.
+	Validate(OrderID) bool
 }

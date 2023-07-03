@@ -28,7 +28,16 @@ We could approach this in many ways.
 I decided to go with a custom http header - `Unicorn-Request-Id`.
 I did not go with the `X-Request-Id` header because it's not official in the HTTP spec and it could be confused with a request ID that identifies each unique http request, and not the request transaction _per se_.
 
+> - if the unicorn is produced it should be returned though using fifo principle
+> - adjust the code, so that every x seconds a new unicorn is produced at put to a store, which can be used to fulfill the requests (LIFO Store)
 
+I am a bit confused in what it is expected in these two points, so I'am not certain how it would fit in the reference code.
+Are the LIFO store and the random unicorn FIFO production two separate things and add up, or one replaces the other?
+
+My interpretation is that each request can be served by either: the LIFO store or the random time generator. Both them are served in a FIFO principle to requesters, in that, any who returns 
+
+One should return the unicorns in a FIFO principle but store them following a LIFO principle?
+Do clients share these 
 
 
 ## Assumptions

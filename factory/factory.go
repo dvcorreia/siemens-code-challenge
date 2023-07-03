@@ -28,6 +28,11 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// Factory can produce new unicorns.
+type Factory interface {
+	NewUnicorn() *unicorn.Unicorn
+}
+
 type factory struct {
 	// data for unicorn generation
 	names []string
@@ -37,6 +42,8 @@ type factory struct {
 	// number of capabilities to attribute to a unicorn
 	nCap int
 }
+
+var _ Factory = (*factory)(nil)
 
 // Option is function used to customize the factory.
 type Option func(*factory) error

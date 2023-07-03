@@ -50,7 +50,7 @@ func main() {
 		mux := http.NewServeMux()
 
 		httpSrv := http.Server{
-			Addr:              ":8080",
+			Addr:              ":8000",
 			Handler:           mux,
 			ReadHeaderTimeout: defaultReadHeaderTimeout,
 		}
