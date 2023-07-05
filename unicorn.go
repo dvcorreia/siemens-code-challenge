@@ -14,7 +14,7 @@ type OrderID string
 type Service interface {
 	// RequestUnicorns initiates a new unicorn production request.
 	// If no sufficient unicorn are available, it returns a request ID for consequent pooling.
-	OrderUnicorns(n int) (OrderID, error)
+	OrderUnicorns(amount int) (OrderID, error)
 
 	// Pool returns the available ordered unicorns and how many are left to produce.
 	Pool(OrderID) (int, []Unicorn)

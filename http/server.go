@@ -10,7 +10,7 @@ import (
 )
 
 // OrderIDHeader Is the name of the HTTP Header which contains the request id.
-// Exported so that it can be changed by developers
+// Exported so that it can be changed by developers.
 var OrderIDHeader = "X-Unicorn-Order-Id"
 
 var (
