@@ -1,11 +1,12 @@
 package app
 
 import (
-	"crypto/rand"
 	"errors"
+	"math/rand"
 	"sync"
 	"unicorn"
 	"unicorn/pkg/queue"
+	"unicorn/storage"
 )
 
 // Length of a Order ID.
@@ -63,17 +64,20 @@ func (o *order) Completed() bool {
 }
 
 func (o *order) completed() bool {
-	return o.amount <= o.produced
+	return o.amount == o.produced
 }
 
 // IsFulfilled returns the order fulfilled status and the number of pending unicorn.
-func (o *order) IsFulfilled() (int, bool) {
+func (o *order) IsFulfilled() bool {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 
-	pending := o.amount - o.collected
+	return o.amount == o.collected
+}
 
-	return pending, pending <= 0
+// Pending returns the number of unicorns that are left to fulfill the order.
+func (o *order) Pending() int {
+	return o.amount - o.collected
 }
 
 // Collect available unicorns.
@@ -95,12 +99,40 @@ func (o *order) Collect() ([]*unicorn.Unicorn, error) {
 	return unicorns, nil
 }
 
+// CollectFromStorage fulfills the order with unicorns in storage.
+func (o *order) CollectFromStorage(store storage.UnicornStorage) ([]*unicorn.Unicorn, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	if o.completed() {
+		return nil, ErrOrderCompleted
+	}
+
+	pending := o.amount - o.collected
+
+	var toCollect int
+	switch stored := store.InStorage(); {
+	case stored == 0:
+		return []*unicorn.Unicorn{}, nil
+	case stored < pending:
+		toCollect = stored
+	case stored >= pending:
+		toCollect = pending
+	}
+
+	o.produced += toCollect
+	o.collected += toCollect
+	return store.Collect(toCollect), nil
+}
+
+const charset = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ1234567890"
+
 // randomID generates a random identifier n characters long.
 func randomID(n int) (string, error) {
-	c := 16
-	b := make([]byte, c)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+	b := make([]byte, n)
+
+	for i := 0; i < len(b); i++ {
+		b[i] = charset[rand.Intn(len(charset)-1)]
 	}
 
 	return string(b), nil

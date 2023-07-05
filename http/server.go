@@ -16,7 +16,7 @@ var OrderIDHeader = "X-Unicorn-Order-Id"
 var (
 	ErrNoAmount        = errors.New("no unicorn amount provided for the order")
 	ErrInvalidAmount   = errors.New("invalid amount of unicorns")
-	ErrOrderIDNotFound = errors.New("coult not find your order ID")
+	ErrOrderIDNotFound = errors.New("could not find your order")
 )
 
 type ErrorResponse struct {
@@ -24,17 +24,21 @@ type ErrorResponse struct {
 }
 
 type UnicornsResponse struct {
-	Pending  int               `json:"pending"`
-	OrderID  string            `json:"orderId,omitempty"`
-	Unicorns []unicorn.Unicorn `json:"unicorns,omitempty"`
+	Pending  int                `json:"pending"`
+	OrderID  string             `json:"orderId,omitempty"`
+	Unicorns []*unicorn.Unicorn `json:"unicorns,omitempty"`
 }
 
 func HandleGetUnicorns(svc unicorn.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id := getOrderID(r)
+		if r.Method != "GET" {
+			http.NotFound(w, r)
+			return
+		}
 
+		id := getOrderID(r)
 		if id == "" {
-			HandleNewOrder(svc)(w, r)
+			handleNewOrder(svc)(w, r)
 			return
 		}
 
@@ -43,7 +47,17 @@ func HandleGetUnicorns(svc unicorn.Service) http.HandlerFunc {
 			return
 		}
 
-		pending, unicorns := svc.Pool(id)
+		unicorns, err := svc.Pool(id)
+		if err != nil {
+			raise(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		pending, err := svc.PendingUnicorns(id)
+		if err != nil {
+			raise(w, err, http.StatusInternalServerError)
+			return
+		}
 
 		response := UnicornsResponse{
 			Pending:  pending,
@@ -55,7 +69,7 @@ func HandleGetUnicorns(svc unicorn.Service) http.HandlerFunc {
 	}
 }
 
-func HandleNewOrder(svc unicorn.Service) http.HandlerFunc {
+func handleNewOrder(svc unicorn.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		amount, err := getAmount(r)
 		if err != nil {
@@ -71,7 +85,17 @@ func HandleNewOrder(svc unicorn.Service) http.HandlerFunc {
 
 		setOrderID(w, id)
 
-		pending, unicorns := svc.Pool(id)
+		unicorns, err := svc.Pool(id)
+		if err != nil {
+			raise(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		pending, err := svc.PendingUnicorns(id)
+		if err != nil {
+			raise(w, err, http.StatusInternalServerError)
+			return
+		}
 
 		response := UnicornsResponse{
 			Pending:  pending,
@@ -90,7 +114,7 @@ func getAmount(r *http.Request) (int, error) {
 	}
 
 	amount, err := strconv.Atoi(s)
-	if err != nil {
+	if err != nil || amount <= 0 {
 		return 0, ErrInvalidAmount
 	}
 

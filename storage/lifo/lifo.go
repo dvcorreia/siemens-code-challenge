@@ -1,4 +1,4 @@
-package storage
+package lifo
 
 import (
 	"sync"
@@ -9,7 +9,7 @@ import (
 )
 
 type storage struct {
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	stack *stack.Stack[*unicorn.Unicorn]
 }
 
@@ -31,8 +31,8 @@ func (s *storage) Store(unicorn *unicorn.Unicorn) {
 
 // InStorage returns the number o unicorns in storage.
 func (s *storage) InStorage() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.stack.Size()
 }
 

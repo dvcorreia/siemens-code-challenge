@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -12,20 +11,22 @@ import (
 	"syscall"
 	"time"
 	"unicorn/factory"
+	unicornhttp "unicorn/http"
+	"unicorn/internal/app"
+	"unicorn/storage"
+	"unicorn/storage/lifo"
 )
 
 // Defaults.
 const (
-	defaultStoreGenInterval     = time.Duration(5) * time.Second
-	defaultMaxRandomGenInterval = time.Duration(1) * time.Second // the same as the code reference.
+	defaultProductionRate = time.Duration(5) * time.Second
 
 	defaultReadHeaderTimeout = 2 * time.Second
 )
 
 func main() {
 	var (
-		storeGenInterval  = flag.Duration("store-interval", defaultStoreGenInterval, "period in which the store will generate a new unicorn")
-		randomGenInterval = flag.Duration("max-random-interval", defaultMaxRandomGenInterval, "maxium time in which the random generator will producer a new unicorn.")
+		productionRate = flag.Duration("prod-rate", defaultProductionRate, "period in which the production line will generate a new unicorn")
 	)
 
 	flag.Parse()
@@ -33,11 +34,12 @@ func main() {
 	logger := log.New(os.Stdout, "unicorn: ", log.Lshortfile)
 	logger.Println("setting up service ...")
 
-	logger.Printf("config: store-interval=%v random-gen-interval=%+v", storeGenInterval, randomGenInterval)
+	logger.Printf("config: prod-rate=%v", productionRate)
 
+	// Unicorn factory
 	factory, err := factory.New(factory.NCapabilities(3))
 	if err != nil {
-		panic(err)
+		logger.Fatalf("creating unicorn factory: %v", err)
 	}
 
 	// Setup context cancellation for graceful shutdown
@@ -45,12 +47,25 @@ func main() {
 
 	var wg sync.WaitGroup
 
+	// Build application service
+	var storage storage.UnicornStorage = storage.WithLogs(logger, lifo.New())
+
+	productionLine, err := app.NewProductionLine(*productionRate, factory, app.WithStorage(storage))
+	if err != nil {
+		logger.Fatalf("creating unicorn production line: %v", err)
+	}
+
+	svc := app.New(productionLine, storage)
+
 	// Setup HTTP server
 	{
 		mux := http.NewServeMux()
 
+		mux.Handle("/unicorns", unicornhttp.WithLogs(logger, unicornhttp.HandleGetUnicorns(svc)))
+
+		addr := ":8000"
 		httpSrv := http.Server{
-			Addr:              ":8000",
+			Addr:              addr,
 			Handler:           mux,
 			ReadHeaderTimeout: defaultReadHeaderTimeout,
 		}
@@ -68,21 +83,24 @@ func main() {
 		go func() {
 			defer wg.Done()
 
+			logger.Printf("listening http at %s", addr)
 			if err := httpSrv.ListenAndServe(); err != http.ErrServerClosed {
 				logger.Printf("server closed unexpectedly: %v", err)
 			}
 		}()
 	}
 
+	// Start production
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		productionLine.Start(ctx)
+		logger.Println("production line has stopped")
+	}()
+
 	<-ctx.Done()
 	wg.Wait()
 
-	unicorn := factory.NewUnicorn()
-
-	data, err := json.Marshal(unicorn)
-	if err != nil {
-		panic(err)
-	}
-
-	logger.Printf("%s", string(data))
+	logger.Printf("gracefully shutted down")
 }

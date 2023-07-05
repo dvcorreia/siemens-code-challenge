@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func Logs(logger *log.Logger, next http.Handler) http.Handler {
+func WithLogs(logger *log.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -20,7 +20,15 @@ func Logs(logger *log.Logger, next http.Handler) http.Handler {
 
 		dur := time.Since(start)
 
-		log.Printf("Request %s %s ~ status=%d took=%v size=%d", r.Method, r.RequestURI, lrw.status, dur, lrw.size)
+		logger.Printf(
+			"Request %s %s ~ status=%d id=%s took=%v size=%d",
+			r.Method,
+			r.RequestURI,
+			lrw.status,
+			r.Header.Get(OrderIDHeader),
+			dur,
+			lrw.size,
+		)
 	})
 }
 

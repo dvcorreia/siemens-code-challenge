@@ -16,9 +16,12 @@ type Service interface {
 	// If no sufficient unicorn are available, it returns a request ID for consequent pooling.
 	OrderUnicorns(amount int) (OrderID, error)
 
-	// Pool returns the available ordered unicorns and how many are left to produce.
-	Pool(OrderID) (int, []Unicorn)
+	// Pool returns the available ordered unicorns.
+	Pool(OrderID) ([]*Unicorn, error)
 
 	// Validate checks if an ID has an orden in the process.
 	Validate(OrderID) bool
+
+	// PendingUnicorns checks how many unicorns are left to fulfill the production order.
+	PendingUnicorns(OrderID) (int, error)
 }

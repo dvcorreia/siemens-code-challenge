@@ -112,25 +112,38 @@ func (pl *productionLine) fulfill(unicorn *unicorn.Unicorn) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
-	if _, ok := pl.currentOrder.IsFulfilled(); ok {
-		pl.nextOrder()
-	}
+	order := pl.selectOrder()
 
-	if pl.currentOrder == nil {
+	if order == nil {
 		if pl.storage != nil {
 			pl.storage.Store(unicorn)
 		}
 		return
 	}
 
-	pl.currentOrder.Add(unicorn)
+	order.Add(unicorn)
 }
 
-// nextOrder sets the production line to fulfill the next order.
-func (pl *productionLine) nextOrder() {
+// selectOrder selects an order to fulfill.
+func (pl *productionLine) selectOrder() *order {
+	if pl.currentOrder == nil {
+		return pl.nextOrder()
+	}
+
+	if pl.currentOrder.IsFulfilled() {
+		return pl.nextOrder()
+	}
+
+	return pl.currentOrder
+}
+
+// select the next order to be produced.
+func (pl *productionLine) nextOrder() *order {
 	if pl.orderQueue.Empty() {
 		pl.currentOrder = nil
+		return pl.currentOrder
 	}
 
 	pl.currentOrder = pl.orderQueue.Dequeue()
+	return pl.currentOrder
 }
