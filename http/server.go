@@ -47,13 +47,7 @@ func HandleGetUnicorns(svc unicorn.Service) http.HandlerFunc {
 			return
 		}
 
-		unicorns, err := svc.Pool(id)
-		if err != nil {
-			raise(w, err, http.StatusInternalServerError)
-			return
-		}
-
-		pending, err := svc.PendingUnicorns(id)
+		unicorns, pending, err := svc.Pool(id)
 		if err != nil {
 			raise(w, err, http.StatusInternalServerError)
 			return
@@ -85,13 +79,7 @@ func handleNewOrder(svc unicorn.Service) http.HandlerFunc {
 
 		setOrderID(w, id)
 
-		unicorns, err := svc.Pool(id)
-		if err != nil {
-			raise(w, err, http.StatusInternalServerError)
-			return
-		}
-
-		pending, err := svc.PendingUnicorns(id)
+		unicorns, pending, err := svc.Pool(id)
 		if err != nil {
 			raise(w, err, http.StatusInternalServerError)
 			return

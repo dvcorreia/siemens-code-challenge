@@ -50,12 +50,14 @@ func main() {
 	// Build application service
 	var storage storage.UnicornStorage = storage.WithLogs(logger, lifo.New())
 
-	productionLine, err := app.NewProductionLine(*productionRate, factory, app.WithStorage(storage))
+	logictics := app.NewLogisticsCenter(storage)
+
+	productionLine := app.NewProductionLine(factory, logictics)
 	if err != nil {
 		logger.Fatalf("creating unicorn production line: %v", err)
 	}
 
-	svc := app.New(productionLine, storage)
+	svc := app.New(logictics)
 
 	// Setup HTTP server
 	{
@@ -95,7 +97,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 
-		productionLine.Start(ctx)
+		productionLine.StartProduction(ctx, *productionRate)
 		logger.Println("production line has stopped")
 	}()
 
