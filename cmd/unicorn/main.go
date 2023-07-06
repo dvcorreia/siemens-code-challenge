@@ -19,6 +19,7 @@ import (
 
 // Defaults.
 const (
+	defaultAddr           = ":8000"
 	defaultProductionRate = time.Duration(5) * time.Second
 
 	defaultReadHeaderTimeout = 2 * time.Second
@@ -26,28 +27,23 @@ const (
 
 func main() {
 	var (
-		productionRate = flag.Duration("prod-rate", defaultProductionRate, "period in which the production line will generate a new unicorn")
+		addr           = flag.String("addr", defaultAddr, "http server address")
+		productionRate = flag.Duration("rate", defaultProductionRate, "period in which the production line will generate a new unicorn")
 	)
 
 	flag.Parse()
 
 	logger := log.New(os.Stdout, "unicorn: ", log.Lshortfile)
-	logger.Println("setting up service ...")
 
+	logger.Println("setting up service ...")
 	logger.Printf("config: prod-rate=%v", productionRate)
 
-	// Unicorn factory
+	// Setup dependencies
 	factory, err := factory.New(factory.NCapabilities(3))
 	if err != nil {
 		logger.Fatalf("creating unicorn factory: %v", err)
 	}
 
-	// Setup context cancellation for graceful shutdown
-	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
-	var wg sync.WaitGroup
-
-	// Build application service
 	var storage storage.UnicornStorage = storage.WithLogs(logger, lifo.New())
 
 	logictics := app.NewLogisticsCenter(storage)
@@ -57,17 +53,24 @@ func main() {
 		logger.Fatalf("creating unicorn production line: %v", err)
 	}
 
-	svc := app.New(logictics)
+	service := app.New(logictics)
+
+	// Setup context cancellation for graceful shutdown
+	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	var wg sync.WaitGroup
 
 	// Setup HTTP server
 	{
 		mux := http.NewServeMux()
 
-		mux.Handle("/unicorns", unicornhttp.WithLogs(logger, unicornhttp.HandleGetUnicorns(svc)))
+		mux.Handle("/unicorns", unicornhttp.WithLogs(
+			logger,
+			unicornhttp.HandleGetUnicorns(service),
+		))
 
-		addr := ":8000"
 		httpSrv := http.Server{
-			Addr:              addr,
+			Addr:              *addr,
 			Handler:           mux,
 			ReadHeaderTimeout: defaultReadHeaderTimeout,
 		}
@@ -85,7 +88,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			logger.Printf("listening http at %s", addr)
+			logger.Printf("listening http at %s", *addr)
 			if err := httpSrv.ListenAndServe(); err != http.ErrServerClosed {
 				logger.Printf("server closed unexpectedly: %v", err)
 			}
@@ -96,13 +99,11 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		productionLine.StartProduction(ctx, *productionRate)
-		logger.Println("production line has stopped")
 	}()
 
 	<-ctx.Done()
 	wg.Wait()
 
-	logger.Printf("gracefully shutted down")
+	logger.Printf("by by, from unicorn application")
 }
